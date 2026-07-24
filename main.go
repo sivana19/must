@@ -5,29 +5,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// Task structure
+// Task structure with IsCompleted field
 type Task struct {
-	ID        int       `json:"id"`
-	Title     string    `json:"title"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int       `json:"id"`
+	Title       string    `json:"title"`
+	IsCompleted bool      `json:"is_completed"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 const fileName = "tasks.json"
 
-// Load tasks from tasks.json file
+// Load tasks from file
 func loadTasks() []Task {
 	fileData, err := os.ReadFile(fileName)
 	if err != nil {
-		// If file doesn't exist yet, return an empty list
 		return []Task{}
 	}
 
 	var tasks []Task
-	// Turn JSON text into Go struct data
 	err = json.Unmarshal(fileData, &tasks)
 	if err != nil {
 		fmt.Println("⚠️ Warning: Could not parse tasks.json")
@@ -37,16 +37,14 @@ func loadTasks() []Task {
 	return tasks
 }
 
-// Save tasks to tasks.json file
+// Save tasks to file
 func saveTasks(tasks []Task) {
-	// Turn Go struct data into clean JSON text
 	jsonData, err := json.MarshalIndent(tasks, "", "  ")
 	if err != nil {
 		fmt.Println("❌ Error saving tasks:", err)
 		return
 	}
 
-	// Write data to the file
 	err = os.WriteFile(fileName, jsonData, 0644)
 	if err != nil {
 		fmt.Println("❌ Error writing file:", err)
@@ -55,20 +53,20 @@ func saveTasks(tasks []Task) {
 
 func main() {
 	fmt.Println("=================================")
-	fmt.Println("🚀 Welcome to Must Task CLI")
+	fmt.Println("🚀 Welcome to Must Task CLI v2")
 	fmt.Println("=================================")
 
-	// 1. Load existing tasks from tasks.json when app starts
 	tasks := loadTasks()
-
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
 		fmt.Println("\nMenu Options:")
 		fmt.Println("1. View Tasks")
 		fmt.Println("2. Add Task")
-		fmt.Println("3. Exit")
-		fmt.Print("Enter option (1-3): ")
+		fmt.Println("3. Mark Task as Complete")
+		fmt.Println("4. Delete Task")
+		fmt.Println("5. Exit")
+		fmt.Print("Enter option (1-5): ")
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -80,12 +78,17 @@ func main() {
 
 		switch choice {
 		case "1":
-			fmt.Println("\n📋 Your Current Tasks:")
+			fmt.Println("\n📋 Your Tasks:")
 			if len(tasks) == 0 {
 				fmt.Println("   No tasks found!")
 			}
 			for _, task := range tasks {
-				fmt.Printf("   [%d] %s (Created: %s)\n",
+				status := "[ ]"
+				if task.IsCompleted {
+					status = "[X]"
+				}
+				fmt.Printf("   %s %d. %s (Created: %s)\n",
+					status,
 					task.ID,
 					task.Title,
 					task.CreatedAt.Format("15:04:05"),
@@ -103,24 +106,75 @@ func main() {
 			}
 
 			newTask := Task{
-				ID:        len(tasks) + 1,
-				Title:     cleanTitle,
-				CreatedAt: time.Now(),
+				ID:          len(tasks) + 1,
+				Title:       cleanTitle,
+				IsCompleted: false,
+				CreatedAt:   time.Now(),
 			}
 
 			tasks = append(tasks, newTask)
-
-			// 2. Save updated list to file immediately
 			saveTasks(tasks)
-
-			fmt.Printf("✅ Task '%s' added and saved!\n", cleanTitle)
+			fmt.Printf("✅ Task '%s' added!\n", cleanTitle)
 
 		case "3":
+			fmt.Print("Enter task ID to mark complete: ")
+			idInput, _ := reader.ReadString('\n')
+			id, err := strconv.Atoi(strings.TrimSpace(idInput))
+			if err != nil {
+				fmt.Println("⚠️ Invalid ID number!")
+				continue
+			}
+
+			found := false
+			for i := range tasks {
+				if tasks[i].ID == id {
+					tasks[i].IsCompleted = true
+					found = true
+					break
+				}
+			}
+
+			if found {
+				saveTasks(tasks)
+				fmt.Printf("🎉 Task #%d marked as complete!\n", id)
+			} else {
+				fmt.Printf("❌ Task #%d not found!\n", id)
+			}
+
+		case "4":
+			fmt.Print("Enter task ID to delete: ")
+			idInput, _ := reader.ReadString('\n')
+			id, err := strconv.Atoi(strings.TrimSpace(idInput))
+			if err != nil {
+				fmt.Println("⚠️ Invalid ID number!")
+				continue
+			}
+
+			updatedTasks := []Task{}
+			found := false
+
+			for _, task := range tasks {
+				if task.ID == id {
+					found = true
+					continue // Skip adding this task to delete it
+				}
+				updatedTasks = append(updatedTasks, task)
+			}
+
+			if found {
+				tasks = updatedTasks
+				saveTasks(tasks)
+				fmt.Printf("🗑️ Task #%d deleted!\n", id)
+			} else {
+				fmt.Printf("❌ Task #%d not found!\n", id)
+			}
+
+		case "5":
 			fmt.Println("\n👋 Exiting. Happy Coding!")
 			return
 
 		default:
-			fmt.Println("❌ Invalid choice. Please choose 1, 2, or 3.")
+			fmt.Println("❌ Invalid choice. Please choose between 1 and 5.")
 		}
 	}
 }
