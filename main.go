@@ -2,16 +2,55 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 )
 
+// Task structure
 type Task struct {
-	ID        int
-	Title     string
-	CreatedAt time.Time
+	ID        int       `json:"id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+const fileName = "tasks.json"
+
+// Load tasks from tasks.json file
+func loadTasks() []Task {
+	fileData, err := os.ReadFile(fileName)
+	if err != nil {
+		// If file doesn't exist yet, return an empty list
+		return []Task{}
+	}
+
+	var tasks []Task
+	// Turn JSON text into Go struct data
+	err = json.Unmarshal(fileData, &tasks)
+	if err != nil {
+		fmt.Println("⚠️ Warning: Could not parse tasks.json")
+		return []Task{}
+	}
+
+	return tasks
+}
+
+// Save tasks to tasks.json file
+func saveTasks(tasks []Task) {
+	// Turn Go struct data into clean JSON text
+	jsonData, err := json.MarshalIndent(tasks, "", "  ")
+	if err != nil {
+		fmt.Println("❌ Error saving tasks:", err)
+		return
+	}
+
+	// Write data to the file
+	err = os.WriteFile(fileName, jsonData, 0644)
+	if err != nil {
+		fmt.Println("❌ Error writing file:", err)
+	}
 }
 
 func main() {
@@ -19,10 +58,8 @@ func main() {
 	fmt.Println("🚀 Welcome to Must Task CLI")
 	fmt.Println("=================================")
 
-	tasks := []Task{
-		{ID: 1, Title: "Set up Go environment", CreatedAt: time.Now()},
-		{ID: 2, Title: "Learn Go structs and functions", CreatedAt: time.Now()},
-	}
+	// 1. Load existing tasks from tasks.json when app starts
+	tasks := loadTasks()
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -43,7 +80,7 @@ func main() {
 
 		switch choice {
 		case "1":
-			fmt.Println("\n📋 Current Tasks:")
+			fmt.Println("\n📋 Your Current Tasks:")
 			if len(tasks) == 0 {
 				fmt.Println("   No tasks found!")
 			}
@@ -72,7 +109,11 @@ func main() {
 			}
 
 			tasks = append(tasks, newTask)
-			fmt.Printf("✅ Task '%s' added successfully!\n", cleanTitle)
+
+			// 2. Save updated list to file immediately
+			saveTasks(tasks)
+
+			fmt.Printf("✅ Task '%s' added and saved!\n", cleanTitle)
 
 		case "3":
 			fmt.Println("\n👋 Exiting. Happy Coding!")
